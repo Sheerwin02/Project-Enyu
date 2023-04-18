@@ -30041,6 +30041,10 @@ MonoBehaviour:
     m_Bits: 64
   jumpforce: 15
   movespeed: 10
+  dashSpeed: 10
+  dashCooldown: 2
+  dashDuration: 0.5
+  dashKey: 304
 --- !u!212 &1362291513
 SpriteRenderer:
   m_ObjectHideFlags: 0
