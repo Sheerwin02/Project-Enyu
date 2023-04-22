@@ -4,28 +4,42 @@ using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
 {
-    [SerializeField] private float speed;
-    [SerializeField] private LayerMask groundLayer;
+    //[SerializeField] private float speed;
+    //[SerializeField] private LayerMask groundLayer;
     private Rigidbody2D body;
     private Animator animator;
     private BoxCollider2D boxCollider;
-    private SpriteRenderer sprite;
-    MovementState currentState;
+    //private SpriteRenderer sprite;
+    //MovementState currentState;
 
     [SerializeField] private LayerMask jumpableGround;
 
     // Running and jumping parameter
     private float directionX = 0f;
-    [SerializeField] public float jumpforce = 20f;
-    [SerializeField] private float movespeed = 10f;
+    public float jumpforce = 10f;
+    [SerializeField] private float movespeed = 10.0f;
+    public float maxJumpVelocity = 10.0f;
 
     // Dashing parameter
     public float dashSpeed = 20f;
-    public float dashCooldown = 5f;
-    public float dashDuration = 1f;
+    public float dashCooldown = 4f;
+    public float dashDuration = .7f;
     public KeyCode dashKey = KeyCode.LeftShift;
 
-    private enum MovementState { idle, running, jumping, falling, dash }
+    // Wall Running parameter
+    //public float wallJumpForce = 10.0f;
+    //public float wallSlideSpeed = 1.0f;
+    //public float wallStickTime = 0.25f;
+    //public float wallJumpTime = 0.5f;
+    //public Transform groundCheck;
+    //public Transform wallCheck;
+    //public float groundCheckRadius = 0.1f;
+    //public float wallCheckDistance = 0.1f;
+    //private float wallStickTimer = 0.0f;
+    //private float wallJumpTimer = 0.0f;
+    //public LayerMask whatIsGround;
+
+    private enum MovementState { idle, running, jumping, falling, dash, die }
 
     private void Awake()
     {
@@ -33,18 +47,24 @@ public class PlayerMovement : MonoBehaviour
         body = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
         boxCollider = GetComponent<BoxCollider2D>();
-        sprite = GetComponent<SpriteRenderer>();
+        //sprite = GetComponent<SpriteRenderer>();
     }
 
     private void Update()
     {
+        // Return in case in progress to respawn
+        if (animator.GetInteger("state") == 5) return;
+
         directionX = Input.GetAxis("Horizontal");
-        body.velocity = new Vector2(directionX *movespeed / 2, body.velocity.y);
+        body.velocity = new Vector2(directionX *movespeed / 2,  body.velocity.y);
 
-        // Get the current action of the character
-        currentState = (MovementState)animator.GetInteger("state");
+        // Prevent stuck by applying little cheat on character location
+        preventStuck(body.velocity);
+        print(body.velocity);
 
-        //print(movespeed);
+        //Get the current action of the character
+        //currentState = (MovementState)animator.GetInteger("state");
+
         if (movespeed < 70)
         {
             movespeed += 1;
@@ -56,54 +76,48 @@ public class PlayerMovement : MonoBehaviour
         if (Input.GetButtonDown("Jump") && (IsGrounded() || !doubleJumpCheck))
         {
             body.velocity = new Vector2(body.velocity.x, jumpforce);
+            preventStuck(body.velocity);
 
             // Enable doublejump again when touch ground
             if (IsGrounded())
             {
+                //animator.SetBool("isJumping", false);
                 animator.SetBool("isDoubleJump", false);
-            } else
+            }
+            //else if (animator.GetBool("canWallJump"))
+            //{
+            //    //WallJumping();
+            //}
+            else
             {
                 animator.SetBool("isDoubleJump", true);
             }
-            
+
         }
 
         UpdateAnimationState();
     }
 
-    //private void Jump()
-    //{
-    //    animator.SetTrigger("jump");
-    //    body.velocity = new Vector2(body.velocity.x, speed);
-    //    grounded = false;
-    //}
-
-    //private void OnCollisionEnter2D(Collision2D collision)
-    //{
-    //    if (collision.gameObject.tag == "Ground")
-    //    {
-    //        grounded = true;
-    //    }
-    //}
 
     private void UpdateAnimationState()
     {
-        MovementState state;
+        MovementState state = MovementState.idle;
 
         // Running
-        if (directionX > 0f)
+        if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.A))
         {
-            state = MovementState.running;
-            transform.localScale = Vector3.one;
-            //sprite.flipX = false;
+            if (directionX > 0f)
+            {
+                state = MovementState.running;
+                transform.localScale = Vector3.one;
+            }
+            else if (directionX < 0f)
+            {
+                state = MovementState.running;
+                transform.localScale = new Vector3(-1, 1, 1);
+            }
         }
-        else if (directionX < 0f)
-        {
-            state = MovementState.running;
-            //sprite.flipX = true;
-            transform.localScale = new Vector3(-1,1,1);
-        }
-        else
+        else if (directionX == 0)
         {
             state = MovementState.idle;
             movespeed = 10;
@@ -151,12 +165,73 @@ public class PlayerMovement : MonoBehaviour
 
         yield return new WaitForSeconds(dashDuration);
 
-        body.velocity = Vector2.zero;
         animator.SetBool("isDashing", false);
 
         animator.SetBool("isDashingCooldown", true);
         yield return new WaitForSeconds(dashCooldown);
 
         animator.SetBool("isDashingCooldown", false);
+    }
+
+
+    // Wall jumping
+    //private void WallJumping()
+    //{
+    //    bool isTouchingWall = animator.GetBool("isTouchingWall");
+    //    animator.SetBool("isTouchingWall", Physics2D.Raycast(wallCheck.position, transform.right, wallCheckDistance, whatIsGround));
+
+    //    if (isTouchingWall && !IsGrounded())
+    //    {
+    //        animator.SetBool("isWallSliding", true);
+    //    }
+    //    else
+    //    {
+    //        animator.SetBool("isWallSliding", false);
+    //    }
+
+    //    if (animator.GetBool("isWallSliding"))
+    //    {
+    //        body.velocity = new Vector2(body.velocity.x, Mathf.Clamp(body.velocity.y, -wallSlideSpeed, float.MaxValue));
+    //        wallStickTimer += Time.fixedDeltaTime;
+    //        if (Input.GetKeyDown(KeyCode.Space))
+    //        {
+    //            animator.SetBool("canWallJump", true);
+    //        }
+    //    }
+    //    else
+    //    {
+    //        wallStickTimer = 0.0f;
+    //    }
+
+    //    if (animator.GetBool("canWallJump") && wallStickTimer < wallStickTime)
+    //    {
+    //        body.velocity = new Vector2(-transform.right.x * wallJumpForce, jumpForce);
+    //        isJumping = true;
+    //        canWallJump = false;
+    //        wallJumpTimer = 0.0f;
+    //    }
+    //    if (animator.GetBool("isJumping"))
+    //    {
+    //        wallJumpTimer += Time.fixedDeltaTime;
+    //        if (wallJumpTimer > wallJumpTime)
+    //        {
+    //            isJumping = false;
+    //        }
+    //    }
+
+
+    //}
+
+    // Hardcoded function to prevent charcter from stucking in a place
+    private void preventStuck(Vector2 velocity)
+    {
+        if (velocity.x != 0)
+        {
+            body.transform.position = new Vector2(body.transform.position.x + 0.01f, body.transform.position.y);
+        }
+        else if (velocity.y != 0)
+        {
+            body.transform.position = new Vector2(body.transform.position.x, body.transform.position.y + 0.01f);
+        }
     }
 }
